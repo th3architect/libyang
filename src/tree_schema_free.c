@@ -992,6 +992,34 @@ lysc_extension_instance_free(struct ly_ctx *ctx, struct lysc_ext_substmt *substm
         }
 
         switch (substmts[u].stmt) {
+        case LY_STMT_CONFIG:
+        case LY_STMT_STATUS:
+            /* nothing to do */
+            break;
+        case LY_STMT_CONTAINER:
+        case LY_STMT_CHOICE:
+        case LY_STMT_USES: {
+            struct lysc_node *child, *child_next;
+
+            LY_LIST_FOR_SAFE(*((struct lysc_node **)substmts[u].storage), child_next, child) {
+                lysc_node_free_(ctx, child);
+            }
+            break;
+        }
+        case LY_STMT_IF_FEATURE: {
+            struct lysc_iffeature *iff = *((struct lysc_iffeature **)substmts[u].storage);
+            if (!iff) {
+                break;
+            }
+            if (substmts[u].cardinality < LY_STMT_CARD_SOME) {
+                /* single item */
+                lysc_iffeature_free(ctx, iff);
+                free(iff);
+            } else {
+                /* multiple items */
+                FREE_ARRAY(ctx, iff, lysc_iffeature_free);
+            }
+            break;
         case LY_STMT_TYPE:
             if (substmts[u].cardinality < LY_STMT_CARD_SOME) {
                 /* single item */
@@ -1024,24 +1052,6 @@ lysc_extension_instance_free(struct ly_ctx *ctx, struct lysc_ext_substmt *substm
                     break;
                 }
                 FREE_STRINGS(ctx, strs);
-            }
-            break;
-        case LY_STMT_STATUS:
-        case LY_STMT_CONFIG:
-            /* nothing to do */
-            break;
-        case LY_STMT_IF_FEATURE: {
-            struct lysc_iffeature *iff = *((struct lysc_iffeature **)substmts[u].storage);
-            if (!iff) {
-                break;
-            }
-            if (substmts[u].cardinality < LY_STMT_CARD_SOME) {
-                /* single item */
-                lysc_iffeature_free(ctx, iff);
-                free(iff);
-            } else {
-                /* multiple items */
-                FREE_ARRAY(ctx, iff, lysc_iffeature_free);
             }
             break;
         }

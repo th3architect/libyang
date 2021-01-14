@@ -628,9 +628,7 @@ lys_compile_extension_instance(struct lysc_ctx *ctx, const struct lysp_ext_insta
     LY_ERR ret = LY_EVALID, r;
     LY_ARRAY_COUNT_TYPE u;
     struct lysp_stmt *stmt;
-    struct lysp_qname *iffeatures, *iffeat;
     void *parsed = NULL, **compiled = NULL;
-    ly_bool enabled;
 
     /* check for invalid substatements */
     for (stmt = ext->child; stmt; stmt = stmt->next) {
@@ -654,20 +652,76 @@ lys_compile_extension_instance(struct lysc_ctx *ctx, const struct lysp_ext_insta
     /* keep order of the processing the same as the order in the defined substmts,
      * the order is important for some of the statements depending on others (e.g. type needs status and units) */
     for (u = 0; substmts[u].stmt; ++u) {
-        ly_bool stmt_present = 0;
+        uint64_t stmt_counter = 0;
 
         for (stmt = ext->child; stmt; stmt = stmt->next) {
             if (substmts[u].stmt != stmt->kw) {
                 continue;
             }
 
-            stmt_present = 1;
+            parsed = NULL;
+            stmt_counter++;
             if (substmts[u].storage) {
                 switch (stmt->kw) {
+                case LY_STMT_CONTAINER:
+                case LY_STMT_CHOICE:
+                case LY_STMT_USES:
+                    r = lysp_stmt_parse(ctx, stmt, &parsed, NULL);
+                    LY_CHECK_ERR_GOTO(r, ret = r, cleanup);
+
+                    /* set storage as an alternative document root in the compile context */
+                    ctx->ext_data = substmts[u].storage;
+                    r = lys_compile_node(ctx, parsed, NULL, 0, NULL);
+                    ctx->ext_data = NULL;
+                    lysp_node_free(ctx->ctx, parsed);
+                    LY_CHECK_ERR_GOTO(r, ret = r, cleanup);
+                    break;
+                case LY_STMT_IF_FEATURE: {
+                    ly_bool enabled;
+
+                    r = lysp_stmt_parse(ctx, stmt, &parsed, NULL);
+                    LY_CHECK_ERR_GOTO(r, ret = r, cleanup);
+
+                    r = lys_eval_iffeatures(ctx->ctx, parsed, &enabled);
+                    FREE_ARRAY(ctx->ctx, (struct lysp_qname *)parsed, lysp_qname_free);
+                    LY_CHECK_ERR_GOTO(r, ret = r, cleanup);
+                    if (!enabled) {
+                        /* it is disabled, remove the whole extension instance */
+                        return LY_ENOT;
+                    }
+                    break;
+                }
                 case LY_STMT_STATUS:
                     assert(substmts[u].cardinality < LY_STMT_CARD_SOME);
-                    LY_CHECK_ERR_GOTO(r = lysp_stmt_parse(ctx, stmt, stmt->kw, &substmts[u].storage, /* TODO */ NULL), ret = r, cleanup);
+                    LY_CHECK_ERR_GOTO(r = lysp_stmt_parse(ctx, stmt, &substmts[u].storage, /* TODO */ NULL), ret = r, cleanup);
                     break;
+                case LY_STMT_TYPE: {
+                    uint16_t *flags = lys_compile_extension_instance_storage(LY_STMT_STATUS, substmts);
+                    const char **units = lys_compile_extension_instance_storage(LY_STMT_UNITS, substmts);
+
+                    if (substmts[u].cardinality < LY_STMT_CARD_SOME) {
+                        /* single item */
+                        if (*(struct lysc_type **)substmts[u].storage) {
+                            LOGVAL(ctx->ctx, LY_VCODE_DUPSTMT, stmt->stmt);
+                            goto cleanup;
+                        }
+                        compiled = substmts[u].storage;
+                    } else {
+                        /* sized array */
+                        struct lysc_type ***types = (struct lysc_type ***)substmts[u].storage, **type = NULL;
+                        LY_ARRAY_NEW_GOTO(ctx->ctx, *types, type, ret, cleanup);
+                        compiled = (void *)type;
+                    }
+
+                    r = lysp_stmt_parse(ctx, stmt, &parsed, NULL);
+                    LY_CHECK_ERR_GOTO(r, ret = r, cleanup);
+                    r = lys_compile_type(ctx, NULL, flags ? *flags : 0, ext->name, parsed, (struct lysc_type **)compiled,
+                            units && !*units ? units : NULL, NULL);
+                    lysp_type_free(ctx->ctx, parsed);
+                    free(parsed);
+                    LY_CHECK_ERR_GOTO(r, ret = r, cleanup);
+                    break;
+                }
                 case LY_STMT_UNITS: {
                     const char **units;
 
@@ -687,46 +741,6 @@ lys_compile_extension_instance(struct lysc_ctx *ctx, const struct lysp_ext_insta
                     LY_CHECK_ERR_GOTO(r, ret = r, cleanup);
                     break;
                 }
-                case LY_STMT_TYPE: {
-                    uint16_t *flags = lys_compile_extension_instance_storage(LY_STMT_STATUS, substmts);
-                    const char **units = lys_compile_extension_instance_storage(LY_STMT_UNITS, substmts);
-
-                    if (substmts[u].cardinality < LY_STMT_CARD_SOME) {
-                        /* single item */
-                        if (*(struct lysc_type **)substmts[u].storage) {
-                            LOGVAL(ctx->ctx, LY_VCODE_DUPSTMT, stmt->stmt);
-                            goto cleanup;
-                        }
-                        compiled = substmts[u].storage;
-                    } else {
-                        /* sized array */
-                        struct lysc_type ***types = (struct lysc_type ***)substmts[u].storage, **type = NULL;
-                        LY_ARRAY_NEW_GOTO(ctx->ctx, *types, type, ret, cleanup);
-                        compiled = (void *)type;
-                    }
-
-                    r = lysp_stmt_parse(ctx, stmt, stmt->kw, &parsed, NULL);
-                    LY_CHECK_ERR_GOTO(r, ret = r, cleanup);
-                    r = lys_compile_type(ctx, NULL, flags ? *flags : 0, ext->name, parsed, (struct lysc_type **)compiled,
-                            units && !*units ? units : NULL, NULL);
-                    lysp_type_free(ctx->ctx, parsed);
-                    free(parsed);
-                    LY_CHECK_ERR_GOTO(r, ret = r, cleanup);
-                    break;
-                }
-                case LY_STMT_IF_FEATURE:
-                    iffeatures = NULL;
-                    LY_ARRAY_NEW_GOTO(ctx->ctx, iffeatures, iffeat, ret, cleanup);
-                    iffeat->str = stmt->arg;
-                    iffeat->mod = ctx->pmod;
-                    r = lys_eval_iffeatures(ctx->ctx, iffeatures, &enabled);
-                    LY_ARRAY_FREE(iffeatures);
-                    LY_CHECK_ERR_GOTO(r, ret = r, cleanup);
-                    if (!enabled) {
-                        /* it is disabled, remove the whole extension instance */
-                        return LY_ENOT;
-                    }
-                    break;
                 /* TODO support other substatements (parse stmt to lysp and then compile lysp to lysc),
                  * also note that in many statements their extensions are not taken into account  */
                 default:
@@ -737,7 +751,7 @@ lys_compile_extension_instance(struct lysc_ctx *ctx, const struct lysp_ext_insta
             }
         }
 
-        if (((substmts[u].cardinality == LY_STMT_CARD_MAND) || (substmts[u].cardinality == LY_STMT_CARD_SOME)) && !stmt_present) {
+        if (((substmts[u].cardinality == LY_STMT_CARD_MAND) || (substmts[u].cardinality == LY_STMT_CARD_SOME)) && !stmt_counter) {
             LOGVAL(ctx->ctx, LYVE_SYNTAX_YANG, "Missing mandatory keyword \"%s\" as a child of \"%s%s%s\".",
                     ly_stmt2str(substmts[u].stmt), ext->name, ext->argument ? " " : "", ext->argument ? ext->argument : "");
             goto cleanup;
