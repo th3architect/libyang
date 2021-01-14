@@ -293,14 +293,19 @@ enum ly_stmt {
     LY_STMT_FRACTION_DIGITS,
     LY_STMT_GROUPING,
     LY_STMT_IDENTITY,
-    LY_STMT_IF_FEATURE,         /**< in ::lysc_ext_substmt.storage stored as a pointer to `struct lysc_iffeature` (cardinality < #LY_STMT_CARD_SOME)
-                                     or as a pointer to a [sized array](@ref sizedarrays) `struct lysc_iffeature *` */
+    LY_STMT_IF_FEATURE,         /**< if-feature statements are not compiled, they are evaluated and the parent statement is
+                                     preserved only in case the evaluation of all the if-feature statements is true.
+                                     Therefore there is no storage expected. */
     LY_STMT_IMPORT,
     LY_STMT_INCLUDE,
     LY_STMT_INPUT,
     LY_STMT_KEY,
-    LY_STMT_LEAF,
-    LY_STMT_LEAF_LIST,
+    LY_STMT_LEAF,               /**< in ::lysc_ext_substmt.storage stored as a pointer to linked list of `struct lysc_node *`.
+                                     Note that due to ::lysc_node compatibility the leaf can be actually mixed in
+                                     the linked list with other ::lysc_node based nodes if the storage is shared. */
+    LY_STMT_LEAF_LIST,          /**< in ::lysc_ext_substmt.storage stored as a pointer to linked list of `struct lysc_node *`.
+                                     Note that due to ::lysc_node compatibility the leaf-list can be actually mixed in
+                                     the linked list with other ::lysc_node based nodes if the storage is shared. */
     LY_STMT_LENGTH,
     LY_STMT_LIST,               /**< in ::lysc_ext_substmt.storage stored as a pointer to linked list of `struct lysc_node *`.
                                      Note that due to ::lysc_node compatibility the list can be actually mixed in
@@ -312,7 +317,9 @@ enum ly_stmt {
     LY_STMT_MODULE,
     LY_STMT_MUST,
     LY_STMT_NAMESPACE,
-    LY_STMT_NOTIFICATION,
+    LY_STMT_NOTIFICATION,       /**< in ::lysc_ext_substmt.storage stored as a pointer to linked list of `struct lysc_node_notif *`.
+                                     Note that due to ::lysc_node compatibility the notification can be actually mixed in
+                                     the linked list with other ::lysc_node based nodes if the storage is shared. */
     LY_STMT_ORDERED_BY,
     LY_STMT_ORGANIZATION,
     LY_STMT_OUTPUT,
