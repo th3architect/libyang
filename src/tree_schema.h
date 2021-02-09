@@ -281,7 +281,8 @@ enum ly_stmt {
                                      Note that due to ::lysc_node compatibility the container can be actually mixed in
                                      the linked list with other ::lysc_node based nodes if the storage is shared. */
     LY_STMT_DEFAULT,
-    LY_STMT_DESCRIPTION,
+    LY_STMT_DESCRIPTION,        /**< in ::lysc_ext_substmt.storage stored as a pointer to `const char *` (cardinality < #LY_STMT_CARD_SOME)
+                                     or as a pointer to a [sized array](@ref sizedarrays) `const char **` */
     LY_STMT_DEVIATE,
     LY_STMT_DEVIATION,
     LY_STMT_ENUM,
@@ -329,7 +330,8 @@ enum ly_stmt {
     LY_STMT_PREFIX,
     LY_STMT_PRESENCE,
     LY_STMT_RANGE,
-    LY_STMT_REFERENCE,
+    LY_STMT_REFERENCE,          /**< in ::lysc_ext_substmt.storage stored as a pointer to `const char *` (cardinality < #LY_STMT_CARD_SOME)
+                                     or as a pointer to a [sized array](@ref sizedarrays) `const char **` */
     LY_STMT_REFINE,
     LY_STMT_REQUIRE_INSTANCE,
     LY_STMT_REVISION,

@@ -996,8 +996,8 @@ lysc_extension_instance_free(struct ly_ctx *ctx, struct lysc_ext_substmt *substm
         case LY_STMT_STATUS:
             /* nothing to do */
             break;
-        case LY_STMT_CONTAINER:
         case LY_STMT_CHOICE:
+        case LY_STMT_CONTAINER:
         case LY_STMT_USES: {
             struct lysc_node *child, *child_next;
 
@@ -1006,6 +1006,25 @@ lysc_extension_instance_free(struct ly_ctx *ctx, struct lysc_ext_substmt *substm
             }
             break;
         }
+        case LY_STMT_DESCRIPTION:
+        case LY_STMT_REFERENCE:
+        case LY_STMT_UNITS:
+            if (substmts[u].cardinality < LY_STMT_CARD_SOME) {
+                /* single item */
+                const char *str = *((const char **)substmts[u].storage);
+                if (!str) {
+                    break;
+                }
+                lydict_remove(ctx, str);
+            } else {
+                /* multiple items */
+                const char **strs = *((const char ***)substmts[u].storage);
+                if (!strs) {
+                    break;
+                }
+                FREE_STRINGS(ctx, strs);
+            }
+            break;
         case LY_STMT_IF_FEATURE: {
             struct lysc_iffeature *iff = *((struct lysc_iffeature **)substmts[u].storage);
             if (!iff) {
@@ -1035,23 +1054,6 @@ lysc_extension_instance_free(struct ly_ctx *ctx, struct lysc_ext_substmt *substm
                     break;
                 }
                 FREE_ARRAY(ctx, types, lysc_type2_free);
-            }
-            break;
-        case LY_STMT_UNITS:
-            if (substmts[u].cardinality < LY_STMT_CARD_SOME) {
-                /* single item */
-                const char *str = *((const char **)substmts[u].storage);
-                if (!str) {
-                    break;
-                }
-                lydict_remove(ctx, str);
-            } else {
-                /* multiple items */
-                const char **strs = *((const char ***)substmts[u].storage);
-                if (!strs) {
-                    break;
-                }
-                FREE_STRINGS(ctx, strs);
             }
             break;
         }

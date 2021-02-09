@@ -43,6 +43,17 @@ LYEXT_VERSION_CHECK
     {0, 0, 0} /* terminating item */ \
 } \
 
+static void
+fill_substmts(struct lysc_ext_substmt annotation_substmt[], struct lyext_metadata *annotation)
+{
+    annotation_substmt[ANNOTATION_SUBSTMT_IFF].storage = &annotation->iffeatures;
+    annotation_substmt[ANNOTATION_SUBSTMT_DSC].storage = &annotation->dsc;
+    annotation_substmt[ANNOTATION_SUBSTMT_REF].storage = &annotation->ref;
+    annotation_substmt[ANNOTATION_SUBSTMT_UNITS].storage = &annotation->units;
+    annotation_substmt[ANNOTATION_SUBSTMT_STATUS].storage = &annotation->flags;
+    annotation_substmt[ANNOTATION_SUBSTMT_TYPE].storage = &annotation->type;
+}
+
 /**
  * @brief Compile annotation extension instances.
  *
@@ -103,18 +114,14 @@ void
 annotation_free(struct ly_ctx *ctx, struct lysc_ext_instance *ext)
 {
     struct lysc_ext_substmt annotation_substmt[] = INIT_ANNOTATION_SUBSTMT;
+    struct lyext_metadata *annotation;
 
     if (!ext->data) {
         return;
     }
 
-    struct lyext_metadata *annotation = (struct lyext_metadata *)ext->data;
-
-    annotation_substmt[ANNOTATION_SUBSTMT_IFF].storage = &annotation->iffeatures;
-    annotation_substmt[ANNOTATION_SUBSTMT_UNITS].storage = &annotation->units;
-    annotation_substmt[ANNOTATION_SUBSTMT_STATUS].storage = &annotation->flags;
-    annotation_substmt[ANNOTATION_SUBSTMT_TYPE].storage = &annotation->type;
-
+    annotation = (struct lyext_metadata *)ext->data;
+    fill_substmts(annotation_substmt, annotation);
     lysc_extension_instance_free(ctx, annotation_substmt);
     free(ext->data);
 }

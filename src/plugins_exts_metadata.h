@@ -28,6 +28,8 @@ struct lyext_metadata {
     struct lysc_type *type;            /**< type of the metadata (mandatory) */
     const char *units;                 /**< units of the leaf's type */
     struct lysc_iffeature *iffeatures; /**< list of if-feature expressions ([sized array](@ref sizedarrays)) */
+    const char *dsc;                   /**< description */
+    const char *ref;                   /**< reference */
     uint16_t flags;                    /**< [schema node flags](@ref snodeflags) - only LYS_STATUS_* values are allowed */
 };
 
