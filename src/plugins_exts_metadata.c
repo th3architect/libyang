@@ -94,11 +94,7 @@ annotation_compile(struct lysc_ctx *cctx, const struct lysp_ext_instance *p_ext,
     /* compile annotation substatements */
     c_ext->data = annotation = calloc(1, sizeof *annotation);
     LY_CHECK_ERR_RET(!annotation, LOGMEM(cctx->ctx), LY_EMEM);
-    annotation_substmt[ANNOTATION_SUBSTMT_IFF].storage = &annotation->iffeatures;
-    annotation_substmt[ANNOTATION_SUBSTMT_UNITS].storage = &annotation->units;
-    annotation_substmt[ANNOTATION_SUBSTMT_STATUS].storage = &annotation->flags;
-    annotation_substmt[ANNOTATION_SUBSTMT_TYPE].storage = &annotation->type;
-    /* description and reference are allowed, but not compiled */
+    fill_substmts(annotation_substmt, annotation);
 
     LY_CHECK_RET(lys_compile_extension_instance(cctx, p_ext, annotation_substmt));
 
@@ -106,9 +102,26 @@ annotation_compile(struct lysc_ctx *cctx, const struct lysp_ext_instance *p_ext,
 }
 
 /**
+ * @brief INFO printer
+ *
+ * Implementation of lyext_clb_schema_printer set as ::lyext_plugin::sprinter
+ */
+LY_ERR
+annotation_schema_printer(struct lys_ypr_ctx *ctx, struct lysc_ext_instance *ext, ly_bool *flag)
+{
+    struct lysc_ext_substmt annotation_substmt[] = INIT_ANNOTATION_SUBSTMT;
+    struct lyext_metadata *annotation = (struct lyext_metadata *)ext->data;
+
+    fill_substmts(annotation_substmt, annotation);
+    lysc_print_extension_instance(ctx, ext, annotation_substmt, flag);
+
+    return LY_SUCCESS;
+}
+
+/**
  * @brief Free annotation extension instances' data.
  *
- * Implementation of lyext_clb_free callback set as lyext_plugin::free.
+ * Implementation of lyext_clb_free callback set as ::lyext_plugin::free.
  */
 void
 annotation_free(struct ly_ctx *ctx, struct lysc_ext_instance *ext)
@@ -133,5 +146,6 @@ struct lyext_plugin metadata_plugin = {
     .id = "libyang 2 - metadata, version 1",
     .compile = &annotation_compile,
     .validate = NULL,
+    .sprinter = &annotation_schema_printer,
     .free = annotation_free
 };

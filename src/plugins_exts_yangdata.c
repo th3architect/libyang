@@ -156,11 +156,30 @@ yangdata_compile(struct lysc_ctx *cctx, const struct lysp_ext_instance *p_ext, s
 }
 
 /**
+ * @brief INFO printer
+ *
+ * Implementation of ::lyext_clb_schema_printer set as ::lyext_plugin::sprinter
+ */
+LY_ERR
+yangdata_schema_printer(struct lys_ypr_ctx *ctx, struct lysc_ext_instance *ext, ly_bool *flag)
+{
+    struct lysc_ext_substmt yangdata_substmt[] = {
+            {LY_STMT_CONTAINER, LY_STMT_CARD_ANY, &((struct lyext_yangdata *)ext->data)->data},
+            {0, 0, 0} /* terminating item */
+    };
+
+    lysc_print_extension_instance(ctx, ext, yangdata_substmt, flag);
+
+    return LY_SUCCESS;
+}
+
+/**
  * @brief Plugin for the yang-data extension
  */
 struct lyext_plugin yangdata_plugin = {
     .id = "libyang 2 - yang-data, version 1",
     .compile = &yangdata_compile,
     .validate = NULL,
+    .sprinter = &yangdata_schema_printer,
     .free = yangdata_free
 };
